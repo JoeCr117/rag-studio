@@ -1,0 +1,13 @@
+# Layered on compose.yaml by start.ps1 when nvidia-smi works on Windows. Gives api and worker the GPU, only to read
+# VRAM with nvidia-smi, and turns on the app's GPU choices. Model servers get the GPU from the control service.
+x-gpu: &gpu
+  environment:
+    GPU_AVAILABLE: "1"
+  deploy:
+    resources:
+      reservations:
+        devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
+
+services:
+  api: *gpu
+  worker: *gpu

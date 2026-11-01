@@ -1,0 +1,36 @@
+[project]
+name = "rag-studio-backend"
+version = "0.1.0"
+description = "RAG Studio API and worker: source registry, vector databases, sync queue"
+requires-python = ">=3.14"
+dependencies = [
+    "django>=6.1.2",
+    "django-cors-headers>=4.9.0",
+    "django-ninja>=1.7.1",
+    "gunicorn>=26.2.0",
+    "httpx>=0.28.1",
+    "huggingface-hub>=2.3.0",
+    "loguru>=0.7.3",
+    "numpy>=2.5.4",
+    "pathspec>=1.1.1",
+    "pgvector>=0.5.1",
+    "psycopg[binary]>=3.3.6",
+    "qdrant-client>=1.20.0",
+    "semantic-text-splitter>=0.33.1",
+    "tokenizers>=0.23.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-django>=4.14.0",
+    "pyyaml>=6.0.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "studio_site.settings"
+pythonpath = ["."]
+testpaths = ["tests"]

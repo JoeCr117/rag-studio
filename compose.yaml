@@ -1,0 +1,86 @@
+name: rag-studio
+
+services:
+  web:
+    build:
+      context: ./web
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports: ["127.0.0.1:3000:3000"]
+    restart: unless-stopped
+    depends_on: [api]
+
+  api:
+    build: ./backend
+    image: rag-studio-backend
+    ports: ["127.0.0.1:8000:8000"]
+    restart: unless-stopped
+    environment: &backend-environment
+      META_DB_HOST: meta-db
+      VECTOR_ADMIN_URL: postgresql://vectors:vectors@pgvector:5432/postgres
+      QDRANT_URL: http://qdrant:6333
+      CONTROL_URL: http://control:9000
+      MODELS_DIR: /models
+      MODELS_HOST_DIR: \\wsl.localhost\docker-desktop\mnt\docker-desktop-disk\data\docker\volumes\rag-studio_models\_data  # the models volume in Windows Explorer
+      HF_HOME: /models/hf
+    volumes:
+      - models:/models
+      - ./RAGStudioVault:/vault:ro  # hover explanations; edits show on the next hover
+    depends_on:
+      meta-db: {condition: service_healthy}
+      pgvector: {condition: service_healthy}
+      qdrant: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 5s
+      retries: 30
+
+  worker:
+    image: rag-studio-backend
+    command: ["python", "manage.py", "run_worker"]
+    restart: unless-stopped
+    environment: *backend-environment
+    volumes:
+      - models:/models
+      - type: bind  # every Windows drive, read-only; sources are folders under /host/<drive letter>
+        source: /run/desktop/mnt/host
+        target: /host
+        read_only: true
+        bind: {propagation: rslave}  # drives connected later appear without a restart
+    depends_on:
+      api: {condition: service_healthy}
+      control: {condition: service_started}
+
+  control:
+    build: ./control
+    restart: unless-stopped
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]
+
+  meta-db:
+    image: pgvector/pgvector:0.8.7-pg18
+    environment: {POSTGRES_USER: studio, POSTGRES_PASSWORD: studio, POSTGRES_DB: studio}
+    volumes: ["meta-data:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "studio"]
+      interval: 2s
+      retries: 30
+
+  pgvector:
+    image: pgvector/pgvector:0.8.7-pg18
+    ports: ["127.0.0.1:5434:5432"]
+    environment: {POSTGRES_USER: vectors, POSTGRES_PASSWORD: vectors, POSTGRES_DB: postgres}
+    volumes: ["vector-data:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "vectors"]
+      interval: 2s
+      retries: 30
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    volumes: ["qdrant-data:/qdrant/storage"]
+
+volumes:
+  models:
+  meta-data:
+  vector-data:
+  qdrant-data:
